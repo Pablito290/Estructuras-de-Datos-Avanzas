@@ -1,23 +1,3 @@
-#include <vtkActor.h>
-#include <vtkProperty.h>
-#include <vtkCamera.h>
-#include <vtkCellArray.h>
-#include <vtkFloatArray.h>
-#include <vtkNamedColors.h>
-#include <vtkNew.h>
-#include <vtkPointData.h>
-#include <vtkPoints.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkDataSetMapper.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkImageData.h>
-#include <vtkRenderer.h>
-#include <vtkUnsignedCharArray.h>
-#include <vtkVertexGlyphFilter.h>
-
-#include <vtkNamedColors.h>
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -38,7 +18,7 @@ struct Point {
 		z = _z;
 	}
 	void print() {
-		cout << "x=" << x << " y=" << y << " z=" << z;
+		cout << "x=" << x << " y=" << y << " z=" << z ;
 	}
 
 };
@@ -139,7 +119,7 @@ struct OcTree {
 		puntos = p;
 	}
 
-	Point maxmin() {
+	Point maxmin() { //Esta funcion devuelve el menor punto y asigna en la estructura la diferencia con ese punto
 		int maxx = INT_MIN;
 		int maxy = INT_MIN;
 		int maxz = INT_MIN;
@@ -192,7 +172,8 @@ struct OcTree {
 		while (tmp) {
 			for (int i = 0; i < tmp->hojas.size(); i++) {
 				if (tmp->hojas[i].x == p.x and tmp->hojas[i].y == p.y and tmp->hojas[i].z == p.z) {
-					return tmp;
+					//cout << "El punto " << p.x << ";" << p.y << ";" << p.z << " Si existe, estas en el Octal:" << tmp->bottomLeft.x << " " << tmp->bottomLeft.y << " " << tmp->bottomLeft.z << endl;
+					return tmp; 
 				}
 			}
 			double midx = tmp->bottomLeft.x + (tmp->h / 2);
@@ -207,9 +188,11 @@ struct OcTree {
 			else if (tmp->Childrens[6] and p.x <= midx and p.y > midy and p.z > midz) { tmp = tmp->Childrens[6]; }
 			else if (tmp->Childrens[7] and p.x > midx and p.y > midy and p.z > midz) { tmp = tmp->Childrens[7]; }
 			else {
+				//cout << "Nel pastel, no existe" << endl;
 				return NULL;
 			}
 		}
+		//cout << "Nel pastel, no existe" << endl;
 		return NULL;
 	}
 
@@ -240,14 +223,16 @@ struct OcTree {
 		OctalLeafs_R(tmp, v);
 	}
 	Point find_closest(Point p, double radius) {
-		Octal* tmp = OctalContainer(p, radius);
+		Octal* tmp = OctalContainer(p,radius);
 		vector<Point> Candidatos;
 		Leafs(tmp, Candidatos);
 		double min = INT_MAX;
 		Point Closest;
 		for (auto& it : Candidatos) {
+			//cout << "Candidatos:" << it.x << " " << it.y << " " << it.z << endl;
 			double calc = calc = distance(p, it);
-			if (calc < min and calc != 0 and calc < radius) {
+			//cout << "Distancia del candidato" << min << endl<<endl;
+			if (calc < min and calc != 0 and calc<radius) {
 				Closest = it;
 				min = calc;
 			}
@@ -281,46 +266,6 @@ struct OcTree {
 	}
 };
 
-vtkNew<vtkActor> drawCube(double x, double y, double z, double h) {
-	std::array<std::array<double, 3>, 8> pts;
-	pts[0] = { x,y,z };       //0,0,0
-	pts[1] = { x + h, y, z };  //1,0,0
-	pts[2] = { x + h, y + h, z }; //1,1,0
-	pts[3] = { x, y + 1, z };   //0,1,0
-	pts[4] = { x, y, z + h };   //0,0,1
-	pts[5] = { x + h,y,z + h };   //1,0,1
-	pts[6] = { x + h,y + h,z + h }; //1,1,1
-	pts[7] = { x,y + h,z + h };   //0,1,1
-
-	vtkNew<vtkPolyData> cube;
-	vtkNew<vtkPoints> points;
-	vtkNew<vtkCellArray> polys;
-	vtkNew<vtkFloatArray> scalars;
-
-	for (auto i = 0ul; i < pts.size(); ++i) {
-		points->InsertPoint(i, pts[i].data());
-		scalars->InsertTuple1(i, i);
-	}
-	for (auto&& i : ordering) {
-		polys->InsertNextCell(vtkIdType(i.size()), i.data());
-	}
-
-	// We now assign the pieces to the vtkPolyData.
-	cube->SetPoints(points);
-	cube->SetPolys(polys);
-	cube->GetPointData()->SetScalars(scalars);
-
-	// Now we'll look at it.
-	vtkNew<vtkPolyDataMapper> cubeMapper;
-	cubeMapper->SetInputData(cube);
-	cubeMapper->SetScalarRange(cube->GetScalarRange());
-	vtkNew<vtkActor> cubeActor;
-	cubeActor->SetMapper(cubeMapper);
-	cubeActor->GetProperty()->SetRepresentationToWireframe();
-
-	return cubeActor;
-}
-
 int main() {
 	OcTree octree;
 	string filename = "Puntos1.csv"; // Reemplaza con el nombre de tu archivo CSV
@@ -330,27 +275,5 @@ int main() {
 	octree.make();
 	vector<Octal*> octales;
 	octree.OctalLeafs(octales);
-
-	vtkNew<vtkRenderer> renderer;
-	vtkNew<vtkRenderWindow> renderWindow;
-	renderWindow->AddRenderer(renderer);
-
-	vtkNew<vtkRenderWindowInteractor> renderWindowInteractor;
-	renderWindowInteractor->SetRenderWindow(renderWindow);
-
-	vtkNew<vtkNamedColors> colors;
-
-	for (auto& it : octales) {
-		vtkNew<vtkActor> cubeActor = drawCube(it->bottomLeft.x, it->bottomLeft.y, it->bottomLeft.z, it->h);
-		cubeActor->GetProperty()->SetColor(1.0, 1.0, 1.0);
-		renderer->AddActor(cubeActor);
-	}
-
-	renderer->SetBackground(colors->GetColor3d("SteelBlue").GetData());
-
-	renderWindow->Render();
-	renderWindowInteractor->Start();
-
-
-	cout << "yei";
+	
 }
